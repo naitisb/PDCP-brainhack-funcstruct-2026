@@ -1,0 +1,26 @@
+---
+title: "0_preliminary PCA"
+author: "Ju-Chi.Yu"
+date: "2025-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(TInPosition)
+library(PTCA4CATA)
+library(data4PCCAR)
+library(ggplot2)
+library(excel.link)
+
+## read data
+dat <- xl.read.file("../Data/ForKathryn_2025Apr07-2.xlsx", password = "Covid_19", write.res.password="pass")
+
+```
+
