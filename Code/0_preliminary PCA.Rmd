@@ -22,5 +22,7 @@ library(excel.link)
 ## read data
 dat <- xl.read.file("../Data/ForKathryn_2025Apr07-2.xlsx", password = "Covid_19", write.res.password="pass")
 
+
+data
 ```
 
