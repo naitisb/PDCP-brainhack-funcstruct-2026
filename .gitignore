@@ -3,3 +3,4 @@
 .RData
 .Ruserdata
 Data/*.*
+funcstruct/data/derivatives/*
