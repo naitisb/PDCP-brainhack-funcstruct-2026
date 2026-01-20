@@ -49,6 +49,11 @@ mrregister ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nii.gz ${DTI_DIR}/${SUBJECT}_ses-
  -type rigid_affine_nonlinear -force \
  -nl_warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz ${WARP_DIR}/${SUBJECT}_2atlas_warp.nii.gz
 
-# Warp DTI_masked to subject space
-mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.nii.gz ${DTI_DIR}/${SUBJECT}_ses-02y_desc-preproc_dwi.mif \
+# Warp DTI_masked atlas image to subject space
+mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.nii.gz ${DTI_DIR}/PediatricAtlas_1_2y_DTI_masked_to_${SUBJECT}.mif \
  -warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz -interp nearest -force
+
+ # Warp FA atlas image to subject space
+mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nii.gz ${DTI_DIR}/PediatricAtlas_1_2y_FA_to_${SUBJECT}.mif \
+ -warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz -interp nearest -force
+
