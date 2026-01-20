@@ -1,0 +1,299 @@
+---
+title: "0_preliminary PCA"
+author: "Ju-Chi.Yu"
+date: "2025-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(TInPosition)
+library(PTCA4CATA)
+library(data4PCCAR)
+library(ggplot2)
+library(excel.link)
+library(naniar)
+library(RColorBrewer)
+
+## read data
+dat <- xl.read.file("../Data/ForKathryn_2025Apr07-2.xlsx", password = "Covid_19", write.res.password="pass")
+
+
+data_extract <- dat %>%
+  select(ID,
+         Mage, 
+         Education, 
+         ses, 
+         covidqx_infected, 
+         covidqx_hospitalized, 
+         Trimester,
+         preg_demo_income,
+         Total_M3_01,
+         Total_M3_bb1,
+         Total_M3_bb2,
+         TotalBISQ_M12_01,
+         TotalBISQ_M12_bb1,
+         TotalBISQ_M12_bb2,
+         ASQcomm_01,
+         ASQcomm_bb1,
+         ASQcomm_bb2,
+         ASQgm_01,
+         ASQgm_bb1,
+         ASQgm_bb2,
+         ASQfm_01,
+         ASQfm_bb1,
+         ASQfm_bb2,
+         ASQprs_01,
+         ASQprs_bb1,
+         ASQprs_bb2,
+         ASQps_01,
+         ASQps_bb1,
+         ASQps_bb2,
+         ASQSE_12m_01,
+         ASQSE_12m_bb1,
+         ASQSE_12m_bb2,
+         EPDS_T1,
+         Panx_t_T1,
+         SLPdisturb_t_T1,
+         SLPimpair_t_T1
+)
+
+## organizing data
+data_org <- data_extract %>% pivot_longer(cols = Total_M3_01:ASQSE_12m_bb2, 
+                              names_to = c(".value", "birth_type"),
+                              names_pattern = "^(.*)_(.*)$") %>% 
+                              ## make 01-bb2 a variable and merge the columns
+  mutate(ID3 = as.factor(sprintf("%s.%s", ID, birth_type)), 
+         ## create another ID combining the original ID and birth type (i.e., 01, bb1, bb2)
+         birth_type_f = as.factor(birth_type)) %>%
+  select(-ID, -birth_type) ## remove ID and non-factor birth type
+
+## get demographics data
+data_demo <- data_org %>% 
+  select(ID3,
+         Mage, 
+         Education, 
+         ses, 
+         covidqx_infected, 
+         covidqx_hospitalized, 
+         Trimester,
+         preg_demo_income,
+         birth_type_f) %>%
+  column_to_rownames("ID3") # make ID3 the rownames
+
+## get numerical variables for PCA
+data_pca <- data_org %>%
+  ## selecting the numeric variables
+  select(-c(Mage, 
+         Education, 
+         ses, 
+         covidqx_infected, 
+         covidqx_hospitalized, 
+         Trimester,
+         preg_demo_income,
+         birth_type_f)) %>%
+  ## replace 999 and -999 with NA
+  replace_with_na_all(condition = ~.x %in% c(999, -999)) %>%
+  drop_na() %>% ## remove rows with NA
+  column_to_rownames("ID3") # make ID3 the rownames
+
+summary(data_pca)
+
+## quick check on the histogram
+apply(data_pca, 2, hist)
+
+## extract demographics data for the PCA sample
+demo_pca <- data_demo[rownames(data_pca),]
+  
+```
+
+## Design and colors
+
+```{r}
+## design of variables
+var.des <- c(rep("Maternal Mental Health", 2), rep("Maternal Health", 2), rep("Infant Sleep", 2), rep("Child Behaviour", 6))
+
+### color palette
+var.col.idx <- c("Maternal Mental Health" = "#9932CC",
+             "Maternal Health" = "#228B22",
+             "Infant Sleep" = "#436EEE",
+             "Child Behaviour" = "#EE7621")
+
+### create colors for variables
+var.col <- list(gc = as.matrix(var.col.idx),
+                oc = as.matrix(recode(var.des, !!!var.col.idx)))
+rownames(var.col$oc) <- colnames(data_pca)
+
+
+### observation colors
+obs.col <- list(covid = list(),
+                age = list(),
+                edu = list(),
+                preg_demo_income = list())
+
+obs.col$covid$gc = covid.col.idx = c("1" = "#CD2626", 
+                  "3" = "#EE6363", 
+                  "2" = "#EEA9B8") %>% as.matrix
+obs.col$covid$oc <- recode(demo_pca$covidqx_infected, !!!covid.col.idx) %>% as.matrix
+# age.co.idx = paletteer_c("ggthemes::Gray", 1000)# age.co.idx = paletteer_c("ggthemes::Gray", 1000)# age.co.idx = paletteer_c("ggthemes::Gray", 1000)
+
+obs.col$edu$gc = edu.col.idx = brewer.pal(n = 6, name = "Blues") %>% setNames(c(1:6)) %>% as.matrix
+obs.col$edu$oc <- recode(demo_pca$Education, !!!edu.col.idx) %>% as.matrix
+
+obs.col$preg_demo_income$gc = preg_demo_income.col.idx = brewer.pal(n = 9, name = "Greens") %>% setNames(c(1:9)) %>% as.matrix
+obs.col$preg_demo_income$oc <- recode(demo_pca$preg_demo_income, !!!preg_demo_income.col.idx) %>% as.matrix
+
+rownames(obs.col$covid$oc) <- rownames(obs.col$edu$oc) <- rownames(obs.col$preg_demo_income$oc) <- rownames(demo_pca)
+
+```
+
+## Correlation matrix
+
+```{r}
+corrplot::corrplot(cor(data_pca), method = "shade")
+```
+
+## PCA
+
+```{r}
+## run PCA
+pca.res <- epPCA.inference.battery(data_pca, scale = "SS1", graphs = FALSE, test.iters = 1000)
+
+## scree plot
+PlotScree(pca.res$Fixed.Data$ExPosition.Data$eigs,
+          p.ev = pca.res$Inference.Data$components$p.vals)
+```
+
+## Plotting the column factor scores (variables)
+
+```{r}
+x_axis = 1
+y_axis = 2
+
+## create labels
+fig.label <- createxyLabels.gen(x_axis = x_axis, 
+                                y_axis = y_axis,
+                                lambda = pca.res$Fixed.Data$ExPosition.Data$eigs,
+                                tau = pca.res$Fixed.Data$ExPosition.Data$t)
+
+## column factor scores
+p1.fj <- createFactorMap(
+  pca.res$Fixed.Data$ExPosition.Data$fj,
+  axis1 = x_axis, axis2 = y_axis, 
+  col.labels = var.col$oc[rownames(pca.res$Fixed.Data$ExPosition.Data$fj),],
+  col.axes = "grey40",col.background = NULL)
+
+## plot arrow
+p1.fj.arrow <- addArrows(pca.res$Fixed.Data$ExPosition.Data$fj,
+                         axis1 = x_axis, axis2 = y_axis,
+                         color = var.col$oc[rownames(pca.res$Fixed.Data$ExPosition.Data$fj),])
+
+## combine plot
+p1.fj$zeMap_background + p1.fj$zeMap_text + p1.fj.arrow + fig.label
+
+```
+
+## Plotting the row factor scores (observations)
+
+```{r}
+## row factor scores
+### covid
+colnames(pca.res$Fixed.Data$ExPosition.Data$fi) <- paste0("Dimension ", c(1:ncol(pca.res$Fixed.Data$ExPosition.Data$fi)))
+
+f2.fi.covid <- createFactorMap(
+  pca.res$Fixed.Data$ExPosition.Data$fi,
+  axis1 = x_axis, axis2 = y_axis,
+  col.points = obs.col$covid$oc,
+  alpha.points = 0.01,
+  col.axes = "grey40",col.background = NULL
+)
+
+covid.mean <- Boot4Mean(pca.res$Fixed.Data$ExPosition.Data$fi,
+                        demo_pca$covidqx_infected,
+                        niter = 1000)
+
+colnames(covid.mean$BootCube) <-
+  colnames(covid.mean$GroupMeans) <- paste0("Dimension ", c(1:ncol(covid.mean$BootCube)))
+
+
+f2.mfi.covid <- createFactorMap(covid.mean$GroupMeans,
+                                col.points = obs.col$covid$gc[rownames(covid.mean$GroupMeans),],
+                                col.labels = obs.col$covid$gc[rownames(covid.mean$GroupMeans),],
+                                pch = 17, cex = 2,
+                                col.axes = "grey40",col.background = NULL
+)
+
+f2.mfi.ci <- MakeCIEllipses(covid.mean$BootCube, 
+                            col = obs.col$covid$gc[rownames(covid.mean$BootCube),],
+                            alpha.ellipse = 0.1)
+
+f2.fi.covid$zeMap_background + f2.fi.covid$zeMap_dots + f2.mfi.ci + 
+  f2.mfi.covid$zeMap_dots + f2.mfi.covid$zeMap_text + p1.fj$zeMap_text + p1.fj.arrow + fig.label
+
+### education
+f2.fi.edu <- createFactorMap(
+  pca.res$Fixed.Data$ExPosition.Data$fi,
+  axis1 = x_axis, axis2 = y_axis,
+  col.points = obs.col$edu$oc,
+  alpha.points = 0.01,
+  col.axes = "grey40",col.background = NULL
+)
+
+edu.mean <- Boot4Mean(pca.res$Fixed.Data$ExPosition.Data$fi,
+                        demo_pca$Education,
+                        niter = 1000)
+colnames(edu.mean$BootCube) <-
+  colnames(edu.mean$GroupMeans) <- paste0("Dimension ", c(1:ncol(edu.mean$BootCube)))
+
+f2.mfi.edu <- createFactorMap(edu.mean$GroupMeans,
+                              col.points = obs.col$edu$gc[rownames(edu.mean$GroupMeans),],
+                              col.labels = obs.col$edu$gc[rownames(edu.mean$GroupMeans),],
+                              pch = 17, cex = 2,
+                              col.axes = "grey40",col.background = NULL,
+                              constraints = 
+)
+
+f2.mfi.ci.edu <- MakeCIEllipses(edu.mean$BootCube, 
+                            col = obs.col$edu$gc[rownames(edu.mean$BootCube),],
+                            alpha.ellipse = 0.1)
+
+f2.fi.edu$zeMap_background + f2.fi.edu$zeMap_dots + f2.mfi.ci.edu +
+  f2.mfi.edu$zeMap_dots + f2.mfi.edu$zeMap_text + p1.fj$zeMap_text + p1.fj.arrow + fig.label
+
+### income
+f2.fi.income <- createFactorMap(
+  pca.res$Fixed.Data$ExPosition.Data$fi,
+  axis1 = x_axis, axis2 = y_axis,
+  col.points = obs.col$preg_demo_income$oc,
+  alpha.points = 0.01,
+  col.axes = "grey40",col.background = NULL
+)
+
+income.mean <- Boot4Mean(pca.res$Fixed.Data$ExPosition.Data$fi,
+                        demo_pca$preg_demo_income,
+                        niter = 1000)
+colnames(income.mean$BootCube) <-
+  colnames(income.mean$GroupMeans) <- paste0("Dimension ", c(1:ncol(income.mean$BootCube)))
+
+f2.mfi.income <- createFactorMap(income.mean$GroupMeans,
+                                col.points = obs.col$preg_demo_income$gc[rownames(income.mean$GroupMeans),],
+                                col.labels = obs.col$preg_demo_income$gc[rownames(income.mean$GroupMeans),],
+                                pch = 17, cex = 2,
+                                col.axes = "grey40",col.background = NULL)
+
+f2.mfi.ci.income <- MakeCIEllipses(income.mean$BootCube, 
+                            col = obs.col$preg_demo_income$gc[rownames(income.mean$BootCube),],
+                            alpha.ellipse = 0.1)
+
+
+f2.fi.income$zeMap_background + f2.fi.income$zeMap_dots + f2.mfi.ci.income +
+  f2.mfi.income$zeMap_dots + f2.mfi.income$zeMap_text + fig.label
+
+```
+

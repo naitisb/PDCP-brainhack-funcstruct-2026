@@ -1,0 +1,54 @@
+#!/bin/bash
+# Transforming DTI atlas into native space 
+# MB NB EV JM KH January 2026 
+
+# Check script arguments
+args=2
+usage() {
+    COMMAND=$(basename $0)
+    echo
+    echo "Usage:"
+    echo "./$COMMAND [session name] [subject_id]"
+    echo
+	echo "Example:"
+	echo "./$COMMAND ses-02y sub-146"
+echo
+exit
+}
+[ $# -ne $args ] && { usage; exit; }
+
+module load mrtrix3/3.0.8
+
+# Set variables and paths
+SES=$1
+SUBJECT=$2
+
+CURR_DIR=$(pwd)
+ROOT_DIR="${CURR_DIR%/*/*}"
+DATA_DIR="${ROOT_DIR}/data_derivs/derivatives"
+ATLAS_DIR="${ROOT_DIR}/data_derivs/atlases"
+
+DTI_DIR="${DATA_DIR}/DTI/${SUBJECT}/${SES}/dwi"
+FMRI_DIR="${DATA_DIR}/fMRI/${SUBJECT}/${SES}/func"
+ROI_DIR="${DATA_DIR}/ROIs"
+
+# Make results directory
+RESULTS_DIR=${ROOT_DIR}/results/${SUBJECT}
+WARP_DIR=${RESULTS_DIR}/warps
+
+mkdir -p $WARP_DIR
+
+# # Convert atlas FA and DTI masked to MRtrix format
+# mrconvert ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nrrd ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.mif
+# mrconvert ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.nrrd ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.mif
+
+
+# Register atlas to subject space (if not already done)
+# First register FA images
+mrregister ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nii.gz ${DTI_DIR}/${SUBJECT}_ses-02y_desc-FA_mdp.nii.gz \
+ -type rigid_affine_nonlinear -force \
+ -nl_warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz ${WARP_DIR}/${SUBJECT}_2atlas_warp.nii.gz
+
+# Warp DTI_masked to subject space
+mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.nii.gz ${DTI_DIR}/${SUBJECT}_ses-02y_desc-preproc_dwi.mif \
+ -warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz -interp nearest -force
