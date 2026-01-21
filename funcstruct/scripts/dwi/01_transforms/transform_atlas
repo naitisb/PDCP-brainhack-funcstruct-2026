@@ -24,9 +24,12 @@ SES=$1
 SUBJECT=$2
 
 CURR_DIR=$(pwd)
-ROOT_DIR="${CURR_DIR%/*/*}"
-DATA_DIR="${ROOT_DIR}/data_derivs/derivatives"
-ATLAS_DIR="${ROOT_DIR}/data_derivs/atlases/NITRC_1_2y_DTI"
+ROOT_DIR="${CURR_DIR%/*/*/*}"
+DATA_DIR="${ROOT_DIR}/data/derivatives"
+ATLAS_DIR="${ROOT_DIR}/data/atlases/NITRC_1_2y_DTI"
+
+echo "Root directory: $ROOT_DIR"
+echo "Data directory: $DATA_DIR"
 
 DTI_DIR="${DATA_DIR}/DTI/${SUBJECT}/${SES}/dwi"
 FMRI_DIR="${DATA_DIR}/fMRI/${SUBJECT}/${SES}/func"
@@ -35,8 +38,12 @@ ROI_DIR="${DATA_DIR}/ROIs"
 # Make results directory
 RESULTS_DIR=${ROOT_DIR}/results/${SUBJECT}
 WARP_DIR=${RESULTS_DIR}/warps
+TRACTS_DIR=${RESULTS_DIR}/tracts
 
+
+# Create warps and tracts directory if they don't exist
 mkdir -p $WARP_DIR
+mkdir -p $TRACTS_DIR
 
 # # Convert atlas FA and DTI masked to MRtrix format
 # mrconvert ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nrrd ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.mif
@@ -73,8 +80,7 @@ echo
 echo "Transforming atlas fibers to subject space for ${SUBJECT}..."
 echo
 
-# Create tracts directory if it doesn't exist
-mkdir -p ${DTI_DIR}/tracts
+
 
 # Convert atlas VTK fibers to TCK
 for fiber in ${ATLAS_DIR}/Fibers/*.vtk; do
@@ -83,12 +89,12 @@ for fiber in ${ATLAS_DIR}/Fibers/*.vtk; do
     echo "Processing fiber: ${name}"
     echo
     # Convert VTK to TCK (may need tckconvert or custom script)
-    tckconvert ${fiber} ${DTI_DIR}/tracts/atlas_${name}.tck
+    tckconvert ${fiber} ${TRACTS_DIR}/atlas_${name}.tck
     
     # Transform to subject space
-    tcktransform ${DTI_DIR}/tracts/atlas_${name}.tck \
+    tcktransform ${TRACTS_DIR}/atlas_${name}.tck \
         ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz \
-        ${DTI_DIR}/tracts/atlas2_${SUBJECT}_${name}.tck
+        ${TRACTS_DIR}/atlas2_${SUBJECT}_${name}.tck
 
     echo "Transformed fiber saved as: atlas2_${SUBJECT}_${name}.tck"
     echo
