@@ -45,22 +45,43 @@ mkdir -p $WARP_DIR
 
 # Register atlas to subject space (if not already done)
 # First register FA images
+echo
+echo "Registering atlas to subject space using FA map for ${SUBJECT}..."
+echo
 mrregister ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nii.gz ${DTI_DIR}/${SUBJECT}_ses-02y_desc-FA_mdp.nii.gz \
  -type rigid_affine_nonlinear -force \
  -nl_warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz ${WARP_DIR}/${SUBJECT}_2atlas_warp.nii.gz
+echo
+echo "Registration completed."
+echo
 
+echo "Warping DTI_masked atlas image to subject space for ${SUBJECT}..."
+echo
 # Warp DTI_masked atlas image to subject space
 mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.nii.gz ${DTI_DIR}/PediatricAtlas_1_2y_DTI_masked_to_${SUBJECT}.mif \
  -warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz -interp nearest -force
 
+echo "Warping FA atlas image to subject space for ${SUBJECT}..."
+echo
  # Warp FA atlas image to subject space
 mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nii.gz ${DTI_DIR}/PediatricAtlas_1_2y_FA_to_${SUBJECT}.mif \
  -warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz -interp nearest -force
+echo
+echo "Warping complete."
+echo
+
+echo "Transforming atlas fibers to subject space for ${SUBJECT}..."
+echo
+
+# Create tracts directory if it doesn't exist
+mkdir -p ${DTI_DIR}/tracts
 
 # Convert atlas VTK fibers to TCK
 for fiber in ${ATLAS_DIR}/Fibers/*.vtk; do
     name=$(basename ${fiber} .vtk)
     
+    echo "Processing fiber: ${name}"
+    echo
     # Convert VTK to TCK (may need tckconvert or custom script)
     tckconvert ${fiber} ${DTI_DIR}/tracts/atlas_${name}.tck
     
@@ -68,6 +89,9 @@ for fiber in ${ATLAS_DIR}/Fibers/*.vtk; do
     tcktransform ${DTI_DIR}/tracts/atlas_${name}.tck \
         ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz \
         ${DTI_DIR}/tracts/atlas2_${SUBJECT}_${name}.tck
+
+    echo "Transformed fiber saved as: atlas2_${SUBJECT}_${name}.tck"
+    echo
 done
 
 echo "Atlas transformation to subject space completed for ${SUBJECT}."
