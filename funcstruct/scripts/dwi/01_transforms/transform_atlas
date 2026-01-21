@@ -26,7 +26,7 @@ SUBJECT=$2
 CURR_DIR=$(pwd)
 ROOT_DIR="${CURR_DIR%/*/*}"
 DATA_DIR="${ROOT_DIR}/data_derivs/derivatives"
-ATLAS_DIR="${ROOT_DIR}/data_derivs/atlases"
+ATLAS_DIR="${ROOT_DIR}/data_derivs/atlases/NITRC_1_2y_DTI"
 
 DTI_DIR="${DATA_DIR}/DTI/${SUBJECT}/${SES}/dwi"
 FMRI_DIR="${DATA_DIR}/fMRI/${SUBJECT}/${SES}/func"
@@ -57,3 +57,17 @@ mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_DTI_masked.nii.gz ${DTI_DIR}/Pediat
 mrtransform ${ATLAS_DIR}/PediatricAtlas_1_2y_FA.nii.gz ${DTI_DIR}/PediatricAtlas_1_2y_FA_to_${SUBJECT}.mif \
  -warp ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz -interp nearest -force
 
+# Convert atlas VTK fibers to TCK
+for fiber in ${ATLAS_DIR}/Fibers/*.vtk; do
+    name=$(basename ${fiber} .vtk)
+    
+    # Convert VTK to TCK (may need tckconvert or custom script)
+    tckconvert ${fiber} ${DTI_DIR}/tracts/atlas_${name}.tck
+    
+    # Transform to subject space
+    tcktransform ${DTI_DIR}/tracts/atlas_${name}.tck \
+        ${WARP_DIR}/atlas2_${SUBJECT}_warp.nii.gz \
+        ${DTI_DIR}/tracts/atlas2_${SUBJECT}_${name}.tck
+done
+
+echo "Atlas transformation to subject space completed for ${SUBJECT}."
